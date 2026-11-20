@@ -72,8 +72,11 @@ const verifyToken = async (req, res, next) => {
     });
 
     // Find user from database
-    const query = { _id: payload.sub };
-    const user = await users.findOne(query);
+const query = {
+  _id: new ObjectId(payload.sub),
+};
+
+const user = await users.findOne(query);
 
     if (!user) {
       return res.status(401).send({
@@ -104,13 +107,68 @@ const verifyToken = async (req, res, next) => {
 
 
 
+const verifyVendor = (req, res, next) => {
+  if (req.user.role !== "vendor") {
+    return res.status(403).send({
+      message: "Forbidden access",
+    });
+  }
 
-// app.get("/protected", verifyToken, (req, res) => {
-//   res.send({
-//     message: "JWT verification successful!",
-//     user: req.user,
-//   });
-// });
+  next();
+};
+
+
+
+
+
+const verifyCustomer = (req, res, next) => {
+  if (req.user.role !== "customer") {
+    return res.status(403).send({
+      message: "Forbidden access",
+    });
+  }
+
+  next();
+};
+
+
+
+
+const verifyAdmin = (req, res, next) => {
+  if (req.user.role !== "admin") {
+    return res.status(403).send({
+      message: "Forbidden access",
+    });
+  }
+
+  next();
+};
+
+
+
+
+app.get("/vendor-test", verifyToken, verifyVendor, (req, res) => {
+  res.send({ message: "Welcome Vendor!" });
+});
+
+app.get("/customer-test", verifyToken, verifyCustomer, (req, res) => {
+  res.send({ message: "Welcome Customer!" });
+});
+
+app.get("/admin-test", verifyToken, verifyAdmin, (req, res) => {
+  res.send({ message: "Welcome Admin!" });
+});
+
+
+
+
+
+app.get("/protected", verifyToken, (req, res) => {
+  res.send({
+    message: "JWT verification successful!",
+    user: req.user,
+  });
+});
 
 
 // logger
