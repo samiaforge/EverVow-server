@@ -562,6 +562,107 @@ app.get("/admin-test", verifyToken, verifyAdmin, (req, res) => {
 });
 
 
+
+
+
+ // Create Customer Booking
+app.post("/bookings", verifyToken, verifyCustomer, async (req, res) => {
+  try {
+    const { serviceId, eventDate, eventLocation, message } = req.body;
+
+    if (
+      !serviceId ||
+      !eventDate ||
+      !eventLocation?.trim()
+    ) {
+      return res.status(400).send({
+        message: "Please provide all required booking information",
+      });
+    }
+
+    if (!ObjectId.isValid(serviceId)) {
+      return res.status(400).send({
+        message: "Invalid service ID",
+      });
+    }
+
+    const selectedDate = new Date(eventDate);
+
+    if (Number.isNaN(selectedDate.getTime())) {
+      return res.status(400).send({
+        message: "Please provide a valid event date",
+      });
+    }
+
+    // Find an approved and active service
+    const service = await services.findOne({
+      _id: new ObjectId(serviceId),
+      status: "approved",
+      isActive: true,
+    });
+
+    if (!service) {
+      return res.status(404).send({
+        message: "Service not found or unavailable",
+      });
+    }
+
+    // Prevent vendors from booking their own services
+    if (service.vendorId === req.user._id.toString()) {
+      return res.status(403).send({
+        message: "You cannot book your own service",
+      });
+    }
+
+    // Prevent duplicate active bookings for the same date
+    const existingBooking = await bookings.findOne({
+      serviceId: service._id.toString(),
+      customerId: req.user._id.toString(),
+      eventDate: selectedDate,
+      status: { $in: ["pending", "accepted"] },
+    });
+
+    if (existingBooking) {
+      return res.status(409).send({
+        message: "You already have an active booking for this service and date",
+      });
+    }
+
+    const booking = {
+      serviceId: service._id.toString(),
+      serviceName: service.serviceName,
+      vendorId: service.vendorId,
+      vendorName: service.vendorName,
+      customerId: req.user._id.toString(),
+      customerName: req.user.name,
+      customerEmail: req.user.email,
+      eventDate: selectedDate,
+      eventLocation: eventLocation.trim(),
+      message: message?.trim() || "",
+      status: "pending",
+      createdAt: new Date(),
+    };
+
+    const result = await bookings.insertOne(booking);
+
+    res.status(201).send({
+      message: "Booking request submitted successfully",
+      insertedId: result.insertedId,
+    });
+  } catch (error) {
+    console.error("Create booking error:", error);
+    res.status(500).send({
+      message: "Failed to create booking",
+    });
+  }
+});
+
+
+
+
+
+
+
 app.listen(port, () => {
   console.log(`EverVow server is running on port ${port}`);
 });
