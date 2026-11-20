@@ -1,27 +1,30 @@
+
 import express from "express";
 import cors from "cors";
 import "dotenv/config";
 import { MongoClient, ObjectId } from "mongodb";
 import dns from "node:dns";
-import { jwt } from "better-auth/plugins";
 import { jwtVerify, createRemoteJWKSet } from "jose";
 
+// DNS configuration
 dns.setServers(["1.1.1.1"]);
 
 const app = express();
 const port = process.env.PORT || 5000;
 
-// middleware
+// Middleware
 app.use(express.json());
 app.use(cors());
 
+// JWKS configuration
 const JWKS = createRemoteJWKSet(
   new URL("/api/auth/jwks", process.env.BETTER_AUTH_URL)
 );
 
 // MongoDB connection
-const client =   new MongoClient(`mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.w23gcv8.mongodb.net/`);
-
+const client = new MongoClient(
+  `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.w23gcv8.mongodb.net/`
+);
 
 export async function connectToMongoDB() {
   try {
@@ -37,13 +40,15 @@ export async function connectToMongoDB() {
 const connectedClient = await connectToMongoDB();
 const database = connectedClient.db("weddingplan");
 
-// collections
+// Collections
 const users = database.collection("user");
 const services = database.collection("services");
-// const bookings = database.collection("bookings");
-// const transactions = database.collection("transactions");
+const bookings = database.collection("bookings");
+const transactions = database.collection("transactions");
 
 
+
+// Authentication Middleware
 
 
 const verifyToken = async (req, res, next) => {
@@ -72,11 +77,11 @@ const verifyToken = async (req, res, next) => {
     });
 
     // Find user from database
-const query = {
-  _id: new ObjectId(payload.sub),
-};
+    const query = {
+      _id: new ObjectId(payload.sub),
+    };
 
-const user = await users.findOne(query);
+    const user = await users.findOne(query);
 
     if (!user) {
       return res.status(401).send({
@@ -106,6 +111,8 @@ const user = await users.findOne(query);
 
 
 
+// Role Verification Middleware
+
 
 const verifyVendor = (req, res, next) => {
   if (req.user.role !== "vendor") {
@@ -117,10 +124,6 @@ const verifyVendor = (req, res, next) => {
   next();
 };
 
-
-
-
-
 const verifyCustomer = (req, res, next) => {
   if (req.user.role !== "customer") {
     return res.status(403).send({
@@ -130,9 +133,6 @@ const verifyCustomer = (req, res, next) => {
 
   next();
 };
-
-
-
 
 const verifyAdmin = (req, res, next) => {
   if (req.user.role !== "admin") {
@@ -146,53 +146,36 @@ const verifyAdmin = (req, res, next) => {
 
 
 
+// Test Route
 
-app.get("/vendor-test", verifyToken, verifyVendor, (req, res) => {
-  res.send({ message: "Welcome Vendor!" });
-});
 
-app.get("/customer-test", verifyToken, verifyCustomer, (req, res) => {
-  res.send({ message: "Welcome Customer!" });
-});
-
-app.get("/admin-test", verifyToken, verifyAdmin, (req, res) => {
-  res.send({ message: "Welcome Admin!" });
+app.get("/", (req, res) => {
+  res.send("EverVow is looping");
 });
 
 
 
+// Users Related APIs
 
 
-app.get("/protected", verifyToken, (req, res) => {
-  res.send({
-    message: "JWT verification successful!",
-    user: req.user,
-  });
+// Only Admin can see all users
+app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const result = await users.find({}).toArray();
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({
+      message: "Failed to fetch users",
+    });
+  }
 });
 
 
-// logger
-// const myLogger = (req, res, next) => {
-//   console.log("Now hitting API:", req.method, req.url);
-//   next();
-// };
 
-// app.use(myLogger);
-
-// test route
-app.get('/', (req, res) => {
-  res.send('EverVow is looping')
-})
-
-app.get('/users', async(req,res) => {
-  const cursor = users.find({})
-  const result = await cursor.toArray()
-  res.send(result)
-})
+// Services Related APIs
 
 
-// services related APIs
-
+// Get all approved and active services
 app.get("/services", async (req, res) => {
   try {
     const query = {
@@ -213,6 +196,7 @@ app.get("/services", async (req, res) => {
 
 
 
+// Get single service details
 app.get("/services/:id", async (req, res) => {
   try {
     const id = req.params.id;
@@ -245,7 +229,112 @@ app.get("/services/:id", async (req, res) => {
   }
 });
 
-// API routes will go here
+
+
+
+// Add new service (Vendor only)
+app.post("/services", verifyToken, verifyVendor, async (req, res) => {
+  try {
+    const {
+      serviceName,
+      category,
+      description,
+      price,
+      location,
+      images,
+    } = req.body;
+
+    // Validate required fields
+    if (
+      !serviceName?.trim() ||
+      !category?.trim() ||
+      !description?.trim() ||
+      price === undefined ||
+      !location?.trim() ||
+      !Array.isArray(images) ||
+      images.length === 0
+    ) {
+      return res.status(400).send({
+        message: "Please provide all required service information",
+      });
+    }
+
+    // Validate price
+    if (!Number.isFinite(Number(price)) || Number(price) <= 0) {
+      return res.status(400).send({
+        message: "Please provide a valid price",
+      });
+    }
+
+    // Validate images
+    if (!images.every((image) => typeof image === "string" && image.trim())) {
+      return res.status(400).send({
+        message: "Please provide valid image URLs",
+      });
+    }
+
+    const newService = {
+      vendorId: req.user._id.toString(),
+      vendorName: req.user.name,
+      vendorEmail: req.user.email,
+
+      serviceName: serviceName.trim(),
+      category: category.trim(),
+      description: description.trim(),
+      price: Number(price),
+      location: location.trim(),
+      images,
+
+      status: "pending",
+      isActive: true,
+
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const result = await services.insertOne(newService);
+
+    res.status(201).send({
+      message: "Service submitted successfully. Waiting for admin approval.",
+      insertedId: result.insertedId,
+    });
+
+  } catch (error) {
+    console.error("Add service error:", error);
+
+    res.status(500).send({
+      message: "Failed to add service",
+    });
+  }
+});
+
+
+app.get("/protected", verifyToken, (req, res) => {
+  res.send({
+    message: "JWT verification successful!",
+    user: {
+      name: req.user.name,
+      email: req.user.email,
+      role: req.user.role,
+    },
+  });
+});
+
+// Customer test
+app.get("/customer-test", verifyToken, verifyCustomer, (req, res) => {
+  res.send({ message: "Customer access successful!" });
+});
+
+// Vendor test
+app.get("/vendor-test", verifyToken, verifyVendor, (req, res) => {
+  res.send({ message: "Vendor access successful!" });
+});
+
+// Admin test
+app.get("/admin-test", verifyToken, verifyAdmin, (req, res) => {
+  res.send({ message: "Admin access successful!" });
+});
+
 
 app.listen(port, () => {
   console.log(`EverVow server is running on port ${port}`);
