@@ -477,6 +477,64 @@ app.delete("/services/:id", verifyToken, verifyVendor, async (req, res) => {
 
 
 
+
+// Update Vendor's service availability
+app.patch(
+  "/services/:id/availability",
+  verifyToken,
+  verifyVendor,
+  async (req, res) => {
+    try {
+      const id = req.params.id;
+      const { isActive } = req.body;
+
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).send({ message: "Invalid service ID" });
+      }
+
+      if (typeof isActive !== "boolean") {
+        return res.status(400).send({
+          message: "isActive must be true or false",
+        });
+      }
+
+      const query = {
+        _id: new ObjectId(id),
+        vendorId: req.user._id.toString(),
+      };
+
+      const result = await services.updateOne(query, {
+        $set: {
+          isActive,
+          updatedAt: new Date(),
+        },
+      });
+
+      if (result.matchedCount === 0) {
+        return res.status(404).send({ message: "Service not found" });
+      }
+
+      res.send({
+        message: `Service ${isActive ? "activated" : "deactivated"} successfully`,
+        modifiedCount: result.modifiedCount,
+      });
+    } catch (error) {
+      console.error("Availability update error:", error);
+      res.status(500).send({
+        message: "Failed to update service availability",
+      });
+    }
+  }
+);
+
+
+
+
+
+
+
+
+
 app.get("/protected", verifyToken, (req, res) => {
   res.send({
     message: "JWT verification successful!",
