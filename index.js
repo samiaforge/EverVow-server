@@ -337,6 +337,103 @@ app.get("/my-services", verifyToken, verifyVendor, async (req, res) => {
 
 
 
+
+
+// Update Vendor's service
+app.put("/services/:id", verifyToken, verifyVendor, async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    // Validate service ID
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).send({
+        message: "Invalid service ID",
+      });
+    }
+
+    // Find service
+    const query = {
+      _id: new ObjectId(id),
+      vendorId: req.user._id.toString(),
+    };
+
+    const service = await services.findOne(query);
+
+    if (!service) {
+      return res.status(404).send({
+        message: "Service not found",
+      });
+    }
+
+    const {
+      serviceName,
+      category,
+      description,
+      price,
+      location,
+      images,
+    } = req.body;
+
+    // Validate required fields
+    if (
+      !serviceName?.trim() ||
+      !category?.trim() ||
+      !description?.trim() ||
+      price === undefined ||
+      !location?.trim() ||
+      !Array.isArray(images) ||
+      images.length === 0
+    ) {
+      return res.status(400).send({
+        message: "Please provide all required service information",
+      });
+    }
+
+    // Validate price
+    if (!Number.isFinite(Number(price)) || Number(price) <= 0) {
+      return res.status(400).send({
+        message: "Please provide a valid price",
+      });
+    }
+
+    // Validate images
+    if (!images.every((image) => typeof image === "string" && image.trim())) {
+      return res.status(400).send({
+        message: "Please provide valid image URLs",
+      });
+    }
+
+    const updatedService = {
+      serviceName: serviceName.trim(),
+      category: category.trim(),
+      description: description.trim(),
+      price: Number(price),
+      location: location.trim(),
+      images,
+      status: "pending",
+      updatedAt: new Date(),
+    };
+
+    const result = await services.updateOne(query, {
+      $set: updatedService,
+    });
+
+    res.send({
+      message: "Service updated successfully. Waiting for admin approval.",
+      modifiedCount: result.modifiedCount,
+    });
+  } catch (error) {
+    console.error("Update service error:", error);
+
+    res.status(500).send({
+      message: "Failed to update service",
+    });
+  }
+});
+
+
+
+
 app.get("/protected", verifyToken, (req, res) => {
   res.send({
     message: "JWT verification successful!",
