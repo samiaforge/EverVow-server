@@ -1,0 +1,25 @@
+{
+  "dependencies": {
+    "better-auth": "^1.7.26",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.10",
+    "express": "^5.3.0",
+    "jose": "^6.2.18",
+    "mongodb": "^7.9.1"
+  },
+  "name": "weddingplan-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  },
+  "scripts": {
+   "dev": "nodemon index.js",
+  "start": "node index.js"
+},
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module"
+}
