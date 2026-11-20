@@ -434,6 +434,49 @@ app.put("/services/:id", verifyToken, verifyVendor, async (req, res) => {
 
 
 
+
+
+
+
+// Delete Vendor's service
+app.delete("/services/:id", verifyToken, verifyVendor, async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    // Check whether the ID is valid
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).send({ message: "Invalid service ID" });
+    }
+
+    // Find only the service owned by the logged-in vendor
+    const query = {
+      _id: new ObjectId(id),
+      vendorId: req.user._id.toString(),
+    };
+
+    const result = await services.deleteOne(query);
+
+    if (result.deletedCount === 0) {
+      return res.status(404).send({ message: "Service not found" });
+    }
+
+    res.send({
+      message: "Service deleted successfully",
+      deletedCount: result.deletedCount,
+    });
+  } catch (error) {
+    console.error("Delete service error:", error);
+    res.status(500).send({ message: "Failed to delete service" });
+  }
+});
+
+
+
+
+
+
+
+
 app.get("/protected", verifyToken, (req, res) => {
   res.send({
     message: "JWT verification successful!",
