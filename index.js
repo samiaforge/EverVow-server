@@ -190,6 +190,61 @@ app.get('/users', async(req,res) => {
   res.send(result)
 })
 
+
+// services related APIs
+
+app.get("/services", async (req, res) => {
+  try {
+    const query = {
+      status: "approved",
+      isActive: true,
+    };
+
+    const result = await services.find(query).toArray();
+
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({
+      message: "Failed to fetch services",
+    });
+  }
+});
+
+
+
+
+app.get("/services/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).send({
+        message: "Invalid service ID",
+      });
+    }
+
+    const query = {
+      _id: new ObjectId(id),
+      status: "approved",
+      isActive: true,
+    };
+
+    const result = await services.findOne(query);
+
+    if (!result) {
+      return res.status(404).send({
+        message: "Service not found",
+      });
+    }
+
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({
+      message: "Failed to fetch service details",
+    });
+  }
+});
+
 // API routes will go here
 
 app.listen(port, () => {
