@@ -662,6 +662,85 @@ app.post("/bookings", verifyToken, verifyCustomer, async (req, res) => {
 
 
 
+// Get Customer's Bookings
+app.get("/my-bookings", verifyToken, verifyCustomer, async (req, res) => {
+  try {
+    const query = {
+      customerId: req.user._id.toString(),
+    };
+
+    const result = await bookings
+      .find(query)
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    res.send(result);
+  } catch (error) {
+    console.error("Get my bookings error:", error);
+    res.status(500).send({
+      message: "Failed to fetch your bookings",
+    });
+  }
+});
+
+
+
+
+
+
+// Cancel Customer's Booking
+app.patch(
+  "/bookings/:id/cancel",
+  verifyToken,
+  verifyCustomer,
+  async (req, res) => {
+    try {
+      const id = req.params.id;
+
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).send({
+          message: "Invalid booking ID",
+        });
+      }
+
+      const query = {
+        _id: new ObjectId(id),
+        customerId: req.user._id.toString(),
+        status: "pending",
+      };
+
+      const result = await bookings.updateOne(query, {
+        $set: {
+          status: "cancelled",
+          updatedAt: new Date(),
+        },
+      });
+
+      if (result.matchedCount === 0) {
+        return res.status(404).send({
+          message: "Pending booking not found",
+        });
+      }
+
+      res.send({
+        message: "Booking cancelled successfully",
+        modifiedCount: result.modifiedCount,
+      });
+    } catch (error) {
+      console.error("Cancel booking error:", error);
+      res.status(500).send({
+        message: "Failed to cancel booking",
+      });
+    }
+  }
+);
+
+
+
+
+
+
+
 
 app.listen(port, () => {
   console.log(`EverVow server is running on port ${port}`);
