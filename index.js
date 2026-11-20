@@ -309,6 +309,34 @@ app.post("/services", verifyToken, verifyVendor, async (req, res) => {
 });
 
 
+
+
+
+// Get Vendor's own services
+app.get("/my-services", verifyToken, verifyVendor, async (req, res) => {
+  try {
+    const query = {
+      vendorId: req.user._id.toString(),
+    };
+
+    const result = await services
+      .find(query)
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    res.send(result);
+  } catch (error) {
+    console.error("Get my services error:", error);
+
+    res.status(500).send({
+      message: "Failed to fetch your services",
+    });
+  }
+});
+
+
+
+
 app.get("/protected", verifyToken, (req, res) => {
   res.send({
     message: "JWT verification successful!",
