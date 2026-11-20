@@ -437,7 +437,6 @@ app.put("/services/:id", verifyToken, verifyVendor, async (req, res) => {
 
 
 
-
 // Delete Vendor's service
 app.delete("/services/:id", verifyToken, verifyVendor, async (req, res) => {
   try {
@@ -469,8 +468,6 @@ app.delete("/services/:id", verifyToken, verifyVendor, async (req, res) => {
     res.status(500).send({ message: "Failed to delete service" });
   }
 });
-
-
 
 
 
@@ -526,8 +523,6 @@ app.patch(
     }
   }
 );
-
-
 
 
 
@@ -687,7 +682,6 @@ app.get("/my-bookings", verifyToken, verifyCustomer, async (req, res) => {
 
 
 
-
 // Cancel Customer's Booking
 app.patch(
   "/bookings/:id/cancel",
@@ -739,6 +733,262 @@ app.patch(
 
 
 
+
+
+ // Get Vendor's Booking Requests
+app.get("/vendor-bookings", verifyToken, verifyVendor, async (req, res) => {
+  try {
+    const query = {
+      vendorId: req.user._id.toString(),
+    };
+
+    const result = await bookings
+      .find(query)
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    res.send(result);
+  } catch (error) {
+    console.error("Get vendor bookings error:", error);
+    res.status(500).send({
+      message: "Failed to fetch booking requests",
+    });
+  }
+});
+
+
+
+
+ // Update Booking Status by Vendor
+app.patch(
+  "/bookings/:id/status",
+  verifyToken,
+  verifyVendor,
+  async (req, res) => {
+    try {
+      const id = req.params.id;
+      const { status } = req.body;
+
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).send({
+          message: "Invalid booking ID",
+        });
+      }
+
+      if (!["accepted", "rejected"].includes(status)) {
+        return res.status(400).send({
+          message: "Status must be accepted or rejected",
+        });
+      }
+
+      const query = {
+        _id: new ObjectId(id),
+        vendorId: req.user._id.toString(),
+        status: "pending",
+      };
+
+      const result = await bookings.updateOne(query, {
+        $set: {
+          status,
+          updatedAt: new Date(),
+        },
+      });
+
+      if (result.matchedCount === 0) {
+        return res.status(404).send({
+          message: "Pending booking not found",
+        });
+      }
+
+      res.send({
+        message: `Booking ${status} successfully`,
+        modifiedCount: result.modifiedCount,
+      });
+    } catch (error) {
+      console.error("Update booking status error:", error);
+      res.status(500).send({
+        message: "Failed to update booking status",
+      });
+    }
+  }
+);
+
+
+
+
+
+
+
+
+ // Get All Services for Admin
+app.get("/admin/services", verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const result = await services
+      .find({})
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    res.send(result);
+  } catch (error) {
+    console.error("Get all services error:", error);
+    res.status(500).send({
+      message: "Failed to fetch services",
+    });
+  }
+});
+
+
+
+
+ // Approve or Reject Service by Admin
+app.patch(
+  "/admin/services/:id/status",
+  verifyToken,
+  verifyAdmin,
+  async (req, res) => {
+    try {
+      const id = req.params.id;
+      const { status } = req.body;
+
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).send({
+          message: "Invalid service ID",
+        });
+      }
+
+      if (!["approved", "rejected"].includes(status)) {
+        return res.status(400).send({
+          message: "Status must be approved or rejected",
+        });
+      }
+
+      const query = {
+        _id: new ObjectId(id),
+        status: "pending",
+      };
+
+      const result = await services.updateOne(query, {
+        $set: {
+          status,
+          updatedAt: new Date(),
+        },
+      });
+
+      if (result.matchedCount === 0) {
+        return res.status(404).send({
+          message: "Pending service not found",
+        });
+      }
+
+      res.send({
+        message: `Service ${status} successfully`,
+        modifiedCount: result.modifiedCount,
+      });
+    } catch (error) {
+      console.error("Service approval error:", error);
+      res.status(500).send({
+        message: "Failed to update service status",
+      });
+    }
+  }
+);
+
+
+
+
+
+ // Update Service Availability by Admin
+app.patch(
+  "/admin/services/:id/availability",
+  verifyToken,
+  verifyAdmin,
+  async (req, res) => {
+    try {
+      const id = req.params.id;
+      const { isActive } = req.body;
+
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).send({
+          message: "Invalid service ID",
+        });
+      }
+
+      if (typeof isActive !== "boolean") {
+        return res.status(400).send({
+          message: "isActive must be true or false",
+        });
+      }
+
+      const result = await services.updateOne(
+        { _id: new ObjectId(id) },
+        {
+          $set: {
+            isActive,
+            updatedAt: new Date(),
+          },
+        }
+      );
+
+      if (result.matchedCount === 0) {
+        return res.status(404).send({
+          message: "Service not found",
+        });
+      }
+
+      res.send({
+        message: `Service ${isActive ? "activated" : "deactivated"} successfully`,
+        modifiedCount: result.modifiedCount,
+      });
+    } catch (error) {
+      console.error("Admin availability update error:", error);
+      res.status(500).send({
+        message: "Failed to update service availability",
+      });
+    }
+  }
+);
+
+
+
+
+
+ // Delete Service by Admin
+app.delete(
+  "/admin/services/:id",
+  verifyToken,
+  verifyAdmin,
+  async (req, res) => {
+    try {
+      const id = req.params.id;
+
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).send({
+          message: "Invalid service ID",
+        });
+      }
+
+      const result = await services.deleteOne({
+        _id: new ObjectId(id),
+      });
+
+      if (result.deletedCount === 0) {
+        return res.status(404).send({
+          message: "Service not found",
+        });
+      }
+
+      res.send({
+        message: "Service deleted successfully",
+        deletedCount: result.deletedCount,
+      });
+    } catch (error) {
+      console.error("Admin delete service error:", error);
+      res.status(500).send({
+        message: "Failed to delete service",
+      });
+    }
+  }
+);
 
 
 
